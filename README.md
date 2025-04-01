@@ -77,7 +77,7 @@ Before running the application, ensure you have the following installed:
 ### 🎥 Video Output
 
 <a href="https://github.com/Thogaruchesti-hemanth/QwickTalk/blob/main/assets/output/output.mp4">
-    <img src="https://github.com/Thogaruchesti-hemanth/QwickTalk/blob/main/assets/output/splashScreen.png" alt="Watch the Video" width="300" height="500">
+    <img src="https://github.com/Thogaruchesti-hemanth/QwickTalk/blob/main/assets/output/splashScreen.png" alt="Watch the Video" width="300" height="400">
 </a>
 
 
