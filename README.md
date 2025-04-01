@@ -62,10 +62,7 @@ We welcome contributions from the community! To contribute:
 - Commit your changes
 - Open a pull request
 
-## Contact
-For any queries, feature requests, or feedback, feel free to reach out:
-- **Email:** [your email/contact info]
-- **GitHub:** [your GitHub profile link]
-- **Twitter:** [your Twitter handle]
-- **LinkedIn:** [your LinkedIn profile link]
-- **Other Social Media:** [any other relevant links]
+## 💬 Connect with Me
+If you have any questions or suggestions, feel free to reach out!
+- GitHub: [@https://github.com/Thogaruchesti-hemanth]
+- LinkedIn: [@https://www.linkedin.com/in/thogaruchesti-hemanth/]
