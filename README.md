@@ -68,18 +68,18 @@ Before running the application, ensure you have the following installed:
 
 ---
 
-## 📸 Screenshots
+## 📸 Results
 
-### 🔹 Home Screen
-![Home Screen](preview_images/home_screen.png)
+| Splash Screen  | Login Screen  | Home Screen  | Profile Page  |
+|--------------|----------------|--------------|----------------|
+| <img src="https://github.com/Thogaruchesti-hemanth/QwickTalk/blob/main/assets/output/splashScreen.png" alt="SplashScreen" height="300"> | <img src="https://github.com/Thogaruchesti-hemanth/QwickTalk/blob/main/assets/output/LoginScreen.png" alt="Login Screen UI" height="300"> | <img src="https://github.com/Thogaruchesti-hemanth/QwickTalk/blob/main/assets/output/homeScreen.png" alt="Home Screen UI" height="300"> | <img src="https://github.com/Thogaruchesti-hemanth/QwickTalk/blob/main/assets/output/profileScreen.png" alt="Profile Page UI" height="300"> |
 
-### 🔹 Chat Interface
-![Chat Interface](preview_images/chat_interface.png)
+### 🎥 Video Output
 
-### 🔹 User Profile
-![User Profile](preview_images/user_profile.png)
+<a href="https://github.com/Thogaruchesti-hemanth/QwickTalk/blob/main/assets/output/output.mp4">
+    <img src="https://github.com/Thogaruchesti-hemanth/QwickTalk/blob/main/assets/output/splashScreen.png" alt="Watch the Video" width="300" height="500">
+</a>
 
-(Add more relevant UI screenshots)
 
 ---
 
