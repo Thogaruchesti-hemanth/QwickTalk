@@ -1,40 +1,54 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <base href="/">
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A sample Flutter web project.">
+  <meta name="description" content="A new Flutter project.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="sample_app">
-  <meta name="google-signin-client_id" content="1234567890-abcdefg.apps.googleusercontent.com" />
+  <meta name="apple-mobile-web-app-title" content="chat_app">
+  <meta name="google-signin-client_id" content="169120042891-660151k3u9o2fmluldjigbp7hvgdgeda.apps.googleusercontent.com" />
 
-  <link rel="apple-touch-icon" href="icons/sample-icon.png">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="sample-favicon.png"/>
+  <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>sample_app</title>
+  <title>chat_app</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
-<script src="flutter_bootstrap.js" async></script>
-<script>
+  <script src="flutter_bootstrap.js" async></script>
+  <script>
     const firebaseConfig = {
-      apiKey: "your-api-key",
-      authDomain: "your-project.firebaseapp.com",
-      projectId: "your-project-id",
-      storageBucket: "your-storage-bucket.appspot.com",
-      messagingSenderId: "your-messaging-sender-id",
-      appId: "your-app-id",
-      measurementId: "your-measurement-id"
-    };
+  apiKey: "AIzaSyDKCMWNhHFZCXB2ck4Shv_AQ99M1NqdQ18",
+  authDomain: "qwicktalk.firebaseapp.com",
+  projectId: "qwicktalk",
+  storageBucket: "qwicktalk.firebasestorage.app",
+  messagingSenderId: "919082993592",
+  appId: "1:919082993592:web:56bc536b8f8b5f0369b14d",
+  measurementId: "G-P8EJXWJQ8V"
+};
+
 
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
