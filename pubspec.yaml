@@ -51,6 +51,7 @@ dependencies:
   flutter_feather_icons: ^2.0.0+1
   shimmer: ^3.0.0
   image_cropper: ^9.0.0
+  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   flutter_test:
