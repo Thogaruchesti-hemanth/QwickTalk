@@ -1,7 +1,6 @@
 import 'package:chat_app/api/apis.dart';
 import 'package:chat_app/models/chat_user.dart';
 import 'package:chat_app/screens/profile_screen.dart';
-import 'package:chat_app/utils/constants.dart';
 import 'package:chat_app/widgets/chat_user_card.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -196,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               },
                               separatorBuilder:
-                                  (context, index) => const Divider(),
+                                  (context, index) => const SizedBox(height: 1),
                             );
                           } else {
                             return const Center(
