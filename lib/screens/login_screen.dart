@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:chat_app/Screens/home_screen.dart';
+import 'package:chat_app/screens/home_screen.dart';
 import 'package:chat_app/api/apis.dart';
 import 'package:chat_app/utils/common_utils.dart';
 import 'package:chat_app/utils/constants.dart';
