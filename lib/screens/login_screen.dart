@@ -1,13 +1,12 @@
-import 'dart:io';
 import 'package:chat_app/screens/home_screen.dart';
 import 'package:chat_app/api/apis.dart';
 import 'package:chat_app/utils/common_utils.dart';
-import 'package:chat_app/utils/constants.dart';
 import 'package:chat_app/utils/dailogs.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,152 +16,125 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  bool _isAnimated = false;
-
+class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   bool _isLoggingIn = false;
+  String _loadingMessage = "Continue with Google";
+  
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 500), () {
-      setState(() {
-        _isAnimated = true;
-      });
-    });
+    _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
+    _fadeController.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
   }
 
   Future<void> _handleLoginClick() async {
     if (_isLoggingIn) return;
+    if (!kIsWeb) HapticFeedback.mediumImpact();
 
-    setState(() => _isLoggingIn = true);
-
-    // Show loading indicator
-    Dialogs.showProgressBar(context);
-
-    final userCredential = await _signInWithGoogle();
-
-    // Close loading indicator
-    Navigator.pop(context);
-    setState(() => _isLoggingIn = false);
-
-    if (userCredential != null && userCredential.user != null) {
-      CommonUtils.prints("User: ${userCredential.user}");
-
-      bool userExists = await APIs.userExists();
-      if (!userExists) await APIs.createUser();
-
-      // Navigate to Home Screen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen()),
-      );
-    } else {
-      Dialogs.showSnackBar(context, "Login Failed! Please try again.");
+    setState(() {
+      _isLoggingIn = true;
+      _loadingMessage = "Authenticating...";
+    });
+    
+    try {
+      final userCredential = await _signInWithGoogle();
+      if (userCredential != null && userCredential.user != null) {
+        setState(() => _loadingMessage = "Verifying...");
+        bool userExists = await APIs.userExists();
+        if (!userExists) await APIs.createUser();
+        if (mounted) {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+        }
+      }
+    } catch (e) {
+      Dialogs.showSnackBar(context, "Login failed. Please try again.");
+    } finally {
+      if (mounted) setState(() => _isLoggingIn = false);
     }
   }
 
   Future<UserCredential?> _signInWithGoogle() async {
-    try {
-      // Check internet connection
-      if (await Connectivity().checkConnectivity() == ConnectivityResult.none) {
-        Dialogs.showAlertDialog(
-          context,
-          "No Internet",
-          "Please check your connection and try again.",
-        );
-        return null;
-      }
-
-      final GoogleSignIn googleSignIn = GoogleSignIn();
-      GoogleSignInAccount? googleUser;
-
-      if (kIsWeb) {
-        GoogleAuthProvider authProvider = GoogleAuthProvider();
-        return await FirebaseAuth.instance.signInWithPopup(authProvider);
-      } else {
-        googleUser = await googleSignIn.signIn();
-      }
-
-      if (googleUser == null) {
-        CommonUtils.prints("Google Sign-In canceled");
-        return null;
-      }
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      return await FirebaseAuth.instance.signInWithCredential(credential);
-    } catch (e) {
-      CommonUtils.prints("Google Sign-In error: $e");
-      Dialogs.showSnackBar(context, "Something went wrong. Try again.");
-      return null;
+    if (kIsWeb) {
+      return await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+    } else {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return null;
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      return await FirebaseAuth.instance.signInWithCredential(GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken, idToken: googleAuth.idToken,
+      ));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final bool isWideScreen = size.width > 600;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Login',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-      ),
+      backgroundColor: const Color(0xFFF8FAFC),
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildLogo(),
-            const SizedBox(height: 30),
-            _buildGoogleLoginButton(),
-          ],
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Container(
+            width: isWideScreen ? 450 : size.width * 0.9,
+            padding: const EdgeInsets.all(32),
+            decoration: isWideScreen ? BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 24)],
+            ) : null,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset('assets/images/app_logo.png', width: 100),
+                const SizedBox(height: 32),
+                const Text("Qwick Talk", style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -1)),
+                const SizedBox(height: 12),
+                const Text("Fast, secure, and short-term messaging.", textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Color(0xFF64748B))),
+                const SizedBox(height: 48),
+                _buildProfessionalGoogleButton(),
+                const SizedBox(height: 32),
+                const Text("Conversations expire after 7 days", style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildLogo() {
-    return AnimatedSwitcher(
-      duration: const Duration(seconds: 1),
-      child:
-          _isAnimated
-              ? Image.asset(
-                'assets/images/app_logo.png',
-                width: Constants.screenWidth * 0.5,
-                key: const ValueKey("logo"),
-              )
-              : const SizedBox.shrink(),
-    );
-  }
-
-  Widget _buildGoogleLoginButton() {
-    return ElevatedButton.icon(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.green.shade100,
-        shape: const StadiumBorder(),
-        elevation: 3,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
-      onPressed: _isLoggingIn ? null : _handleLoginClick,
-      icon:
-          _isLoggingIn
-              ? CircularProgressIndicator(color: Colors.black87)
-              : Image.asset(
-                'assets/images/google.png',
-                height: Constants.screenHeight * 0.03,
-              ),
-      label: Text(
-        _isLoggingIn ? "logging in...." : "Login with Google",
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: Colors.black87,
+  Widget _buildProfessionalGoogleButton() {
+    return InkWell(
+      onTap: _isLoggingIn ? null : _handleLoginClick,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 2),
         ),
+        child: _isLoggingIn 
+          ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF7C3AED))))
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset('assets/images/google.png', height: 24),
+                const SizedBox(width: 12),
+                const Text("Continue with Google", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+              ],
+            ),
       ),
     );
   }

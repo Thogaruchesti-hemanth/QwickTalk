@@ -14,84 +14,165 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  double _opacity = 0.0;
+  late AnimationController _controller;
+  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
 
-    // Ensure full-screen experience
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
+    _controller.forward();
+
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
-        systemNavigationBarColor: Colors.white,
-        statusBarColor: Colors.white,
+        systemNavigationBarColor: Colors.transparent,
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
       ),
     );
 
-    // Start the fade-in animation
-    Future.delayed(const Duration(milliseconds: 500), () {
-      setState(() {
-        _opacity = 1.0;
-      });
-    });
+    _initData();
+  }
 
-    // Navigate after delay
-    Future.delayed(const Duration(milliseconds: 3000), () {
-      if (APIs.auth.currentUser != null) {
-        CommonUtils.prints('\n user : ${APIs.auth.currentUser}');
+  Future<void> _initData() async {
+    await Future.delayed(const Duration(milliseconds: 3000));
+
+    if (APIs.auth.currentUser != null) {
+      try {
+        await APIs.getSelfInfo();
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+          );
+        }
+      }
+    } else {
+      if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => HomeScreen()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => LoginScreen()),
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
       }
-    });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final bool isWideScreen = size.width > 600;
+
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.white, Colors.lightBlueAccent],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: Center(
-          child: AnimatedOpacity(
-            duration: const Duration(seconds: 2),
-            opacity: _opacity,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset('assets/images/app_logo.png', width: 150),
-                const SizedBox(height: 20),
-                const Text(
-                  "Chat App",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                const Text(
-                  "Connecting the world...",
-                  style: TextStyle(fontSize: 16, color: Colors.white70),
-                ),
-                const SizedBox(height: 40),
-                const CircularProgressIndicator(color: Colors.white),
-              ],
+      body: Stack(
+        children: [
+          // Background with the professional Slate theme
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFFFFFFFF), Color(0xFFF1F5F9)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
           ),
-        ),
+
+          Center(
+            child: ScaleTransition(
+              scale: _animation,
+              child: FadeTransition(
+                opacity: _animation,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/images/app_logo.png',
+                      width: isWideScreen ? size.width * 0.12 : size.width * 0.35,
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      "Qwick Talk",
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Rapid • Robust • Reliable",
+                      style: TextStyle(
+                        fontSize: 14,
+                        letterSpacing: 1.2,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          Positioned(
+            bottom: size.height * 0.08,
+            left: 0,
+            right: 0,
+            child: FadeTransition(
+              opacity: _animation,
+              child: Column(
+                children: [
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    "POWERED BY",
+                    style: TextStyle(
+                      fontSize: 11,
+                      letterSpacing: 2,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const Text(
+                    "Thogaruchesti Hemanth",
+                    style: TextStyle(
+                      fontSize: 14,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF7C3AED),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

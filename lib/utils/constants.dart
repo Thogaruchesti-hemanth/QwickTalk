@@ -1,16 +1,18 @@
-import 'dart:ui';
-import 'package:flutter/foundation.dart'; // For kIsWeb
-import 'package:flutter/widgets.dart';
+import 'dart:ui' as ui;
 
 class Constants {
-  static FlutterView view =
-      WidgetsBinding.instance.platformDispatcher.views.first;
-  static Size size = view.physicalSize / view.devicePixelRatio;
+  // Using 'static double get' allows you to keep using Constants.screenWidth 
+  // without parentheses, fixing all compilation errors while being responsive.
+  
+  static double get screenWidth {
+    final view = ui.PlatformDispatcher.instance.views.first;
+    return view.physicalSize.width / view.devicePixelRatio;
+  }
 
-  // If on the web, force physical size to 500
-  static double screenWidth = kIsWeb ? 500 : size.width;
-  static double screenHeight = kIsWeb ? 500 : size.height;
+  static double get screenHeight {
+    final view = ui.PlatformDispatcher.instance.views.first;
+    return view.physicalSize.height / view.devicePixelRatio;
+  }
 
-  // Set max width for web view
-  static double webViewMaxWidth = kIsWeb ? 500 : screenWidth;
+  static const double webMaxWidth = 1200.0;
 }

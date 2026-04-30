@@ -3,9 +3,7 @@ import 'package:chat_app/models/chat_user.dart';
 import 'package:chat_app/utils/common_utils.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-
-import '../utils/constants.dart';
-import 'chat_screen.dart';
+import 'package:flutter_feather_icons/flutter_feather_icons.dart';
 
 class ViewProfileScreen extends StatelessWidget {
   final ChatUser user;
@@ -13,185 +11,111 @@ class ViewProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double screenWidth = MediaQuery.of(context).size.width;
+    final size = MediaQuery.of(context).size;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(
-          user.name,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(FeatherIcons.chevronLeft, color: Color(0xFF0F172A)),
         ),
+        title: Text(user.name, style: const TextStyle(fontWeight: FontWeight.w900)),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+      body: Center(
         child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Profile Picture
-              GestureDetector(
-                onTap: () {
-                  // TODO: Implement zoom-in functionality
-                },
-                child: CircleAvatar(
-                  radius: Constants.screenWidth * 0.250,
-                  backgroundColor: Colors.grey.shade200,
-                  child: ClipOval(
+          child: Container(
+            width: size.width > 600 ? 500 : size.width,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+            child: Column(
+              children: [
+                // Profile Image with ring
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF7C3AED).withOpacity(0.15), width: 3),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(size.height * .1),
                     child: CachedNetworkImage(
-                      width: screenWidth * 0.4,
-                      height: screenWidth * 0.4,
+                      width: size.height * .18,
+                      height: size.height * .18,
                       fit: BoxFit.cover,
                       imageUrl: user.image,
-                      placeholder:
-                          (context, url) => const CircularProgressIndicator(),
-                      errorWidget:
-                          (context, url, error) => const Icon(
-                            Icons.account_circle,
-                            size: 60,
-                            color: Colors.grey,
-                          ),
+                      errorWidget: (context, url, error) => const CircleAvatar(child: Icon(Icons.person)),
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                Text(user.email, style: const TextStyle(fontSize: 16, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                
+                const SizedBox(height: 48),
 
-              const SizedBox(height: 15),
-
-              // Email
-              Text(
-                user.email,
-                style: TextStyle(
-                  color: Colors.black54,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // About Section
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // Info Card
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
                     children: [
-                      const Icon(
-                        Icons.person_outline,
-                        color: Colors.blueAccent,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          user.about.isNotEmpty
-                              ? user.about
-                              : "No bio available",
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.black87,
-                          ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      _buildInfoRow(FeatherIcons.info, "About", user.about),
+                      const Divider(height: 40),
+                      _buildInfoRow(
+                        FeatherIcons.calendar, 
+                        "Member Since", 
+                        CommonUtils.getLastMessageTime(context: context, time: user.createAt, showYear: true)
                       ),
                     ],
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 56),
 
-              // "Joined On" Section
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.event, color: Colors.blueAccent, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      "Joined on ${CommonUtils.getLastMessageTime(context: context, time: user.createAt, showYear: true)}",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // ElevatedButton.icon(
-                  //   onPressed: () {
-                  //     // TODO: Implement edit profile functionality
-                  //   },
-                  //   icon: const Icon(Icons.edit_note),
-                  //   label: const Text("Edit Profile"),
-                  //   style: ElevatedButton.styleFrom(
-                  //     backgroundColor: Colors.blueAccent,
-                  //     padding: const EdgeInsets.symmetric(
-                  //       horizontal: 20,
-                  //       vertical: 12,
-                  //     ),
-                  //     shape: RoundedRectangleBorder(
-                  //       borderRadius: BorderRadius.circular(12),
-                  //     ),
-                  //   ),
-                  // ),
-                  // const SizedBox(width: 15),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(user: user),
-                        ),
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.chat_bubble_outline,
-                      color: Colors.white,
-                    ),
-                    label: const Text(
-                      "Message",
-                      style: TextStyle(fontSize: 20, color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueGrey,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                // Message Button
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(FeatherIcons.messageCircle, size: 20),
+                  label: const Text("SEND MESSAGE", style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C3AED),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    minimumSize: const Size(double.infinity, 60),
+                    elevation: 0,
                   ),
-                ],
-              ),
-
-              const SizedBox(height: 20), // Ensuring enough spacing at bottom
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: const Color(0xFF7C3AED), size: 20),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold, letterSpacing: 1)),
+              const SizedBox(height: 4),
+              Text(value, style: const TextStyle(fontSize: 16, color: Color(0xFF0F172A), fontWeight: FontWeight.w600)),
+            ],
+          ),
+        )
+      ],
     );
   }
 }

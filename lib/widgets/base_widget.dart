@@ -17,7 +17,7 @@ class BaseWidget extends StatelessWidget {
           child:
               isMobile
                   ? child
-                  : SizedBox(width: Constants.webViewMaxWidth, child: child),
+                  : SizedBox(width: Constants.webMaxWidth, child: child),
         );
       },
     );

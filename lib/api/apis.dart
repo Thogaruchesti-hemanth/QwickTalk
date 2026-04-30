@@ -9,6 +9,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:http/http.dart' as http;
+import 'package:googleapis_auth/auth_io.dart' as google_auth;
+
+import 'notification_config.dart';
 
 class APIs {
   static FirebaseAuth auth = FirebaseAuth.instance;
@@ -16,6 +20,10 @@ class APIs {
   static FirebaseDatabase database = FirebaseDatabase.instance;
   static FirebaseStorage storage = FirebaseStorage.instance;
   static FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  static late ChatUser me;
+
+  static User? get currentUser => auth.currentUser;
 
   static Future<void> getFirebaseMessageToken() async {
     await messaging.requestPermission();
@@ -27,48 +35,117 @@ class APIs {
     }
   }
 
-  static late ChatUser me;
+  // --- MODERN FCM V1 PUSH NOTIFICATION (SERVERLESS) ---
+  static Future<String> _getAccessToken() async {
+    final serviceAccountJson = {
+      "type": "service_account",
+      "project_id": NotificationConfig.projectId,
+      "private_key": NotificationConfig.privateKey.replaceAll(r'\n', '\n'),
+      "client_email": NotificationConfig.clientEmail,
+      "client_id": NotificationConfig.clientId,
+    };
 
-  static User get user => auth.currentUser!;
+    List<String> scopes = ["https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/firebase.messaging"];
+
+    final client = await google_auth.clientViaServiceAccount(
+      google_auth.ServiceAccountCredentials.fromJson(serviceAccountJson),
+      scopes,
+    );
+
+    return client.credentials.accessToken.data;
+  }
+
+  static Future<void> sendPushNotification(ChatUser chatUser, String msg) async {
+    try {
+      final bearerToken = await _getAccessToken();
+      final projectId = NotificationConfig.projectId;
+
+      final body = {
+        "message": {
+          "token": chatUser.pushToken,
+          "notification": {"title": me.name, "body": msg},
+          "data": {
+            "click_action": "FLUTTER_NOTIFICATION_CLICK",
+            "id": me.id,
+          }
+        }
+      };
+
+      final res = await http.post(
+        Uri.parse('https://fcm.googleapis.com/v1/projects/$projectId/messages:send'),
+        headers: {
+          HttpHeaders.contentTypeHeader: 'application/json',
+          HttpHeaders.authorizationHeader: 'Bearer $bearerToken'
+        },
+        body: jsonEncode(body),
+      );
+      
+      CommonUtils.prints('Notification Status: ${res.statusCode}');
+    } catch (e) {
+      CommonUtils.prints('Notification Error: $e');
+    }
+  }
 
   static Future<bool> userExists() async {
+    final user = currentUser;
+    if (user == null) return false;
     return (await fireStore.collection('users').doc(user.uid).get()).exists;
   }
 
   static Future<bool> addChatUser(String email) async {
-    final data =
-        await fireStore
-            .collection('users')
-            .where('email', isEqualTo: email)
-            .get();
+    final user = currentUser;
+    if (user == null) return false;
+
+    final data = await fireStore.collection('users').where('email', isEqualTo: email).get();
+            
     if (data.docs.isNotEmpty && data.docs.first.id != user.uid) {
-      fireStore
-          .collection('users')
-          .doc(user.uid)
-          .collection('my_users')
-          .doc(data.docs.first.id)
-          .set({});
+      fireStore.collection('users').doc(user.uid).collection('my_users').doc(data.docs.first.id).set({'isArchived': false});
       return true;
     } else {
       return false;
     }
   }
 
+  static Future<void> archiveChat(ChatUser user) async {
+    await fireStore.collection('users').doc(currentUser!.uid).collection('my_users').doc(user.id).update({'isArchived': true});
+  }
+
+  static Future<void> unarchiveChat(ChatUser user) async {
+    await fireStore.collection('users').doc(currentUser!.uid).collection('my_users').doc(user.id).update({'isArchived': false});
+  }
+
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getMyUsersId() {
+    return fireStore.collection('users').doc(currentUser?.uid ?? '').collection('my_users').where('isArchived', isEqualTo: false).snapshots();
+  }
+
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getArchivedUsersId() {
+    return fireStore.collection('users').doc(currentUser?.uid ?? '').collection('my_users').where('isArchived', isEqualTo: true).snapshots();
+  }
+
+  static Future<void> deleteChat(ChatUser user) async {
+    await fireStore.collection('users').doc(currentUser!.uid).collection('my_users').doc(user.id).delete();
+  }
+
   static Future<void> getSelfInfo() async {
-    await fireStore.collection('users').doc(user.uid).get().then((user) async {
-      if (user.exists) {
-        me = ChatUser.fromJson(user.data()!);
-        await getFirebaseMessageToken();
-        APIs.updateActiveStatus(true);
-      } else {
-        await createUser().then((value) => getSelfInfo());
-      }
-    });
+    final user = currentUser;
+    if (user == null) return;
+
+    final userDoc = await fireStore.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+      me = ChatUser.fromJson(userDoc.data()!);
+      await getFirebaseMessageToken();
+      await updateActiveStatus(true);
+    } else {
+      await createUser();
+      await getSelfInfo();
+    }
   }
 
   static Future<void> createUser() async {
-    final time = DateTime.now().millisecondsSinceEpoch.toString();
+    final user = currentUser;
+    if (user == null) return;
 
+    final time = DateTime.now().millisecondsSinceEpoch.toString();
     final chatUser = ChatUser(
       id: user.uid,
       name: user.displayName.toString(),
@@ -81,147 +158,64 @@ class APIs {
       pushToken: '',
     );
 
-    return await fireStore
-        .collection('users')
-        .doc(user.uid)
-        .set(chatUser.toJson());
+    return await fireStore.collection('users').doc(user.uid).set(chatUser.toJson());
   }
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> getMyUsersId() {
-    return APIs.fireStore
-        .collection('users')
-        .doc(user.uid)
-        .collection('my_users')
-        .snapshots();
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getAllUsers(List<String> userIds) {
+    return fireStore.collection('users').where('id', whereIn: userIds.isEmpty ? [''] : userIds).snapshots();
   }
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> getAllUsers(
-    List<String> userIds,
-  ) {
-    return APIs.fireStore
-        .collection('users')
-        .where('id', whereIn: userIds)
-        .snapshots();
-  }
+  static Future<void> updateActiveStatus(bool isOnline) async {
+    final user = currentUser;
+    if (user == null) return;
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> getUserInfo(
-    ChatUser chatUser,
-  ) {
-    return APIs.fireStore
-        .collection('users')
-        .where('id', isEqualTo: chatUser.id)
-        .snapshots();
-  }
-
-  static Future<void> updateActiveStatus(bool isOnline) {
-    return APIs.fireStore.collection('users').doc(user.uid).update({
-      'is_Online': isOnline,
+    return fireStore.collection('users').doc(user.uid).update({
+      'is_online': isOnline,
       'last_active': DateTime.now().millisecondsSinceEpoch.toString(),
       'push_token': me.pushToken,
     });
   }
 
-  static Future<void> sendFirstMessage(
-    ChatUser chatUser,
-    String msg,
-    Type type,
-  ) async {
-    await fireStore
-        .collection('users')
-        .doc(chatUser.id)
-        .collection('my_users')
-        .doc(user.uid)
-        .set({})
-        .then((value) => sendMessage(chatUser, msg, type));
+  static Future<void> updateProfilePicture(File file) async {
+    final user = currentUser;
+    if (user == null) return;
+
+    try {
+      final ext = file.path.split('.').last;
+      final ref = storage.ref().child('profile_pictures/${user.uid}.$ext');
+      await ref.putFile(file, SettableMetadata(contentType: 'image/$ext'));
+      me.image = await ref.getDownloadURL();
+      await fireStore.collection('users').doc(user.uid).update({'image': me.image});
+    } catch (e) {
+      CommonUtils.prints('Profile Picture Error: $e');
+    }
   }
 
   static Future<void> updateUserInfo() async {
+    final user = currentUser;
+    if (user == null) return;
+
     await fireStore.collection('users').doc(user.uid).update({
       'name': me.name,
       'about': me.about,
     });
   }
 
-  // static Future<void> updateProfilePicture(File file) async {
-  //   final ext = file.path.split('.').last;
-  //   CommonUtils.prints('Extension:$ext');
-  //   final ref = storage.ref().child('profile/pictures/${user.uid}.$ext');
-  //   await ref.putFile(file, SettableMetadata(contentType: 'image/$ext')).then((
-  //     p0,
-  //   ) {
-  //     CommonUtils.prints('Data Transferred: ${p0.bytesTransferred / 1000}kb');
-  //   });
-  //   me.image = await ref.getDownloadURL();
-  //   await fireStore.collection('users').doc(user.uid).update({
-  //     'image': me.image,
-  //   });
-  // }
-
-  static Future<void> updateProfilePicture(File file) async {
-    try {
-      // Read the image file as bytes
-      List<int> imageBytes = await file.readAsBytes();
-
-      // Convert image bytes to Base64 string
-      String base64Image = base64Encode(imageBytes);
-
-      // Store the Base64 image string in Firebase Realtime Database
-      await database.ref('users/${user.uid}').update({'image': base64Image});
-
-      CommonUtils.prints('Image successfully uploaded to Realtime Database.');
-    } catch (e) {
-      CommonUtils.prints('Error uploading image: $e');
-    }
+  static String getConversationID(String id) {
+    final user = currentUser;
+    if (user == null) return '';
+    return user.uid.hashCode <= id.hashCode ? '${user.uid}_$id' : '${id}_${user.uid}';
   }
 
-  static Future<File?> getProfilePicture() async {
-    try {
-      DatabaseReference ref = database.ref('users/${user.uid}/image');
-
-      DatabaseEvent event = await ref.once();
-      String? base64Image = event.snapshot.value as String?;
-
-      if (base64Image == null) return null;
-
-      // Convert Base64 back to bytes
-      List<int> imageBytes = base64Decode(base64Image);
-
-      // Create a temporary file
-      File imageFile = File('/tmp/${user.uid}.png');
-      await imageFile.writeAsBytes(imageBytes);
-
-      return imageFile;
-    } catch (e) {
-      CommonUtils.prints('Error retrieving image: $e');
-      return null;
-    }
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getAllMessages(ChatUser user) {
+    return fireStore.collection('chats/${getConversationID(user.id)}/messages').orderBy('sent', descending: true).snapshots();
   }
 
-  ///Chat Screen Realted APIs///
+  static Future<void> sendMessage(ChatUser chatUser, String msg, Type type, {String repliedTo = ''}) async {
+    final user = currentUser;
+    if (user == null) return;
 
-  static String getConversationID(String id) =>
-      user.uid.hashCode <= id.hashCode
-          ? '${user.uid}_$id'
-          : '${id}_${user.uid}';
-
-  static Stream<QuerySnapshot<Map<String, dynamic>>> getAllMessages(
-    ChatUser user,
-  ) {
-    return APIs.fireStore
-        .collection('chats/${getConversationID(user.id)}/messages')
-        .orderBy('sent', descending: true)
-        .snapshots();
-  }
-
-  //Chat (collection)----> Conversation_id(doc)-->messages(collection)-->message(doc)
-
-  static Future<void> sendMessage(
-    ChatUser chatUser,
-    String msg,
-    Type type,
-  ) async {
     final time = DateTime.now().millisecondsSinceEpoch.toString();
-
     final Message message = Message(
       toId: chatUser.id,
       msg: msg,
@@ -229,63 +223,46 @@ class APIs {
       type: type,
       fromId: user.uid,
       sent: time,
+      repliedTo: repliedTo,
     );
-
-    final ref = fireStore.collection(
-      'chats/${getConversationID(chatUser.id)}/messages/',
-    );
-    await ref.doc(time).set(message.toJson());
+    final ref = fireStore.collection('chats/${getConversationID(chatUser.id)}/messages/');
+    await ref.doc(time).set(message.toJson()).then((value) => sendPushNotification(chatUser, type == Type.text ? msg : '📷 Image'));
   }
 
   static Future<void> updateMessageReadStatus(Message message) async {
-    fireStore
-        .collection('chats/${getConversationID(message.fromId)}/messages')
-        .doc(message.sent)
-        .update({'read': DateTime.now().millisecondsSinceEpoch.toString()});
+    fireStore.collection('chats/${getConversationID(message.fromId == currentUser!.uid ? message.toId : message.fromId)}/messages').doc(message.sent).update({'read': DateTime.now().millisecondsSinceEpoch.toString()});
   }
 
   static Stream<QuerySnapshot> getLastMessage(ChatUser user) {
-    return APIs.fireStore
-        .collection('chats/${getConversationID(user.id)}/messages')
-        .orderBy('sent', descending: true)
-        .limit(1)
-        .snapshots();
+    return fireStore.collection('chats/${getConversationID(user.id)}/messages').orderBy('sent', descending: true).limit(1).snapshots();
   }
 
   static Future<void> sendChatImage(ChatUser chatUser, File file) async {
     final ext = file.path.split('.').last;
-    final ref = storage.ref().child(
-      'images/${getConversationID(chatUser.id)}/${DateTime.now().millisecondsSinceEpoch}.$ext',
-    );
-    await ref.putFile(file, SettableMetadata(contentType: 'image/$ext')).then((
-      p0,
-    ) {
-      CommonUtils.prints('Data Transferred: ${p0.bytesTransferred / 1000}kb');
-    });
-
+    final ref = storage.ref().child('images/${getConversationID(chatUser.id)}/${DateTime.now().millisecondsSinceEpoch}.$ext');
+    await ref.putFile(file, SettableMetadata(contentType: 'image/$ext'));
     final imageUrl = await ref.getDownloadURL();
     await sendMessage(chatUser, imageUrl, Type.image);
   }
 
-  /// Delete a message from Firestore and Storage (if it's an image)
   static Future<void> deleteMessage(Message message) async {
-    await fireStore
-        .collection('chats/${getConversationID(message.toId)}/messages')
-        .doc(message.sent)
-        .delete();
-    if (message.type == Type.image) {
-      await storage.refFromURL(message.msg).delete();
-    }
+    await fireStore.collection('chats/${getConversationID(message.fromId == currentUser!.uid ? message.toId : message.fromId)}/messages').doc(message.sent).delete();
+    if (message.type == Type.image) await storage.refFromURL(message.msg).delete();
   }
 
-  /// Update an existing message
-  static Future<void> updateMessage(
-    Message message,
-    String updatedMessage,
-  ) async {
-    await fireStore
-        .collection('chats/${getConversationID(message.toId)}/messages')
-        .doc(message.sent)
-        .update({'msg': updatedMessage});
+  static Future<void> updateMessage(Message message, String updatedMessage) async {
+    await fireStore.collection('chats/${getConversationID(message.fromId == currentUser!.uid ? message.toId : message.fromId)}/messages').doc(message.sent).update({'msg': updatedMessage});
+  }
+
+  static Future<void> updateTypingStatus(String toId, bool isTyping) async {
+    await fireStore.collection('chats').doc(getConversationID(toId)).set({currentUser!.uid: isTyping}, SetOptions(merge: true));
+  }
+
+  static Stream<DocumentSnapshot<Map<String, dynamic>>> getTypingStatus(ChatUser user) {
+    return fireStore.collection('chats').doc(getConversationID(user.id)).snapshots();
+  }
+
+  static Future<void> addMessageReaction(Message message, String emoji) async {
+    await fireStore.collection('chats/${getConversationID(message.fromId == currentUser!.uid ? message.toId : message.fromId)}/messages').doc(message.sent).update({'reaction': emoji});
   }
 }
