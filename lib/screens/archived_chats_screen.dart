@@ -1,6 +1,7 @@
 import 'package:chat_app/api/apis.dart';
 import 'package:chat_app/models/chat_user.dart';
 import 'package:chat_app/widgets/chat_user_card.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_feather_icons/flutter_feather_icons.dart';
 import 'package:shimmer/shimmer.dart';
@@ -59,7 +60,7 @@ class _ArchivedChatsScreenState extends State<ArchivedChatsScreen> {
             stream: APIs.getAllUsers(userIds),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return _buildShimmerLoading();
-              final list = snapshot.data?.docs.map((e) => ChatUser.fromJson(e.data())).toList() ?? [];
+              final list = snapshot.data?.docs.map((e) => ChatUser.fromJson(e.data() as Map<String, dynamic>)).toList() ?? [];
 
               return ListView.builder(
                 itemCount: list.length,

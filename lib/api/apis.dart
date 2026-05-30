@@ -12,6 +12,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:googleapis_auth/auth_io.dart' as google_auth;
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'notification_config.dart';
 
 class APIs {
@@ -27,7 +29,7 @@ class APIs {
 
   static Future<void> getFirebaseMessageToken() async {
     await messaging.requestPermission();
-    String? token = await messaging.getToken();
+    String? token = await messaging.getToken(vapidKey: dotenv.get('FCM_VAPID_KEY'));
     if (token != null) {
       me.pushToken = token;
       await updateActiveStatus(true);
@@ -56,6 +58,11 @@ class APIs {
   }
 
   static Future<void> sendPushNotification(ChatUser chatUser, String msg) async {
+    if (chatUser.pushToken.isEmpty) {
+      CommonUtils.prints('Notification skipped: No push token for user');
+      return;
+    }
+
     try {
       final bearerToken = await _getAccessToken();
       final projectId = NotificationConfig.projectId;
@@ -63,10 +70,23 @@ class APIs {
       final body = {
         "message": {
           "token": chatUser.pushToken,
-          "notification": {"title": me.name, "body": msg},
+          "notification": {
+            "title": me.name, 
+            "body": msg
+          },
+          "android": {
+            "notification": {
+              "channel_id": "chats",
+              "priority": "high",
+              "sound": "default",
+              "click_action": "FLUTTER_NOTIFICATION_CLICK"
+            }
+          },
           "data": {
             "click_action": "FLUTTER_NOTIFICATION_CLICK",
             "id": me.id,
+            "name": me.name,
+            "type": "chat"
           }
         }
       };
@@ -80,7 +100,7 @@ class APIs {
         body: jsonEncode(body),
       );
       
-      CommonUtils.prints('Notification Status: ${res.statusCode}');
+      CommonUtils.prints('Notification Status: ${res.statusCode} | Response: ${res.body}');
     } catch (e) {
       CommonUtils.prints('Notification Error: $e');
     }
@@ -204,7 +224,10 @@ class APIs {
   static String getConversationID(String id) {
     final user = currentUser;
     if (user == null) return '';
-    return user.uid.hashCode <= id.hashCode ? '${user.uid}_$id' : '${id}_${user.uid}';
+    // Use compareTo for cross-platform consistency instead of hashCode
+    final conversationID = user.uid.compareTo(id) <= 0 ? '${user.uid}_$id' : '${id}_${user.uid}';
+    CommonUtils.prints('Conversation ID for $id: $conversationID');
+    return conversationID;
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> getAllMessages(ChatUser user) {
@@ -233,7 +256,7 @@ class APIs {
     fireStore.collection('chats/${getConversationID(message.fromId == currentUser!.uid ? message.toId : message.fromId)}/messages').doc(message.sent).update({'read': DateTime.now().millisecondsSinceEpoch.toString()});
   }
 
-  static Stream<QuerySnapshot> getLastMessage(ChatUser user) {
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getLastMessage(ChatUser user) {
     return fireStore.collection('chats/${getConversationID(user.id)}/messages').orderBy('sent', descending: true).limit(1).snapshots();
   }
 

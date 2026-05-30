@@ -7,6 +7,7 @@ import 'package:chat_app/api/apis.dart';
 import 'package:chat_app/models/chat_user.dart';
 import 'package:chat_app/screens/view_profile_screen.dart';
 import 'package:chat_app/widgets/message_card.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -39,15 +40,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Timer? _typingTimer;
   bool _isWindowFocused = true;
 
+  late Stream<QuerySnapshot> _messageStream;
+  StreamSubscription? _messageSubscription;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _toggleSecureScreen(true);
     
-    APIs.getAllMessages(widget.user).listen((snapshot) {
+    _messageStream = APIs.getAllMessages(widget.user);
+    _messageSubscription = _messageStream.listen((snapshot) {
       for (var doc in snapshot.docs) {
-        Message message = Message.fromJson(doc.data());
+        Message message = Message.fromJson(doc.data() as Map<String, dynamic>);
         if (message.read.isEmpty && message.fromId != APIs.currentUser!.uid) {
           APIs.updateMessageReadStatus(message);
         }
@@ -98,6 +103,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _toggleSecureScreen(false);
     _typingTimer?.cancel();
+    _messageSubscription?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     APIs.updateTypingStatus(widget.user.id, false);
@@ -124,32 +130,42 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 children: [
                   Expanded(
                     child: StreamBuilder(
-                      stream: APIs.getAllMessages(widget.user),
+                      stream: _messageStream,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) return const SizedBox();
-                        
-                        final data = snapshot.data?.docs;
-                        _list = data?.map((e) => Message.fromJson(e.data())).toList() ?? [];
-                        
-                        final displayList = _isSearching 
-                            ? _list.where((m) => m.msg.toLowerCase().contains(_searchQuery.toLowerCase())).toList()
-                            : _list;
+                        if (snapshot.hasError) {
+                          return Center(child: Text('Error: ${snapshot.error}'));
+                        }
 
-                        return displayList.isNotEmpty
-                            ? ListView.builder(
-                                reverse: true,
-                                controller: _scrollController,
-                                itemCount: displayList.length,
-                                padding: EdgeInsets.only(top: kToolbarHeight + 60, bottom: 16),
-                                physics: const BouncingScrollPhysics(),
-                                itemBuilder: (context, index) {
-                                  return MessageCard(
-                                    message: displayList[index],
-                                    onReply: (msg) => setState(() => _replyMessage = msg),
-                                  );
-                                },
-                              )
-                            : _buildSayHi();
+                        switch (snapshot.connectionState) {
+                          case ConnectionState.waiting:
+                            return const SizedBox();
+                          case ConnectionState.active:
+                          case ConnectionState.done:
+                            final data = snapshot.data?.docs;
+                            _list = data?.map((e) => Message.fromJson(e.data() as Map<String, dynamic>)).toList() ?? [];
+                            
+                            final displayList = _isSearching 
+                                ? _list.where((m) => m.msg.toLowerCase().contains(_searchQuery.toLowerCase())).toList()
+                                : _list;
+
+                            return displayList.isNotEmpty
+                                ? ListView.builder(
+                                    reverse: true,
+                                    controller: _scrollController,
+                                    itemCount: displayList.length,
+                                    padding: EdgeInsets.only(top: kToolbarHeight + 60, bottom: 16),
+                                    physics: const BouncingScrollPhysics(),
+                                    itemBuilder: (context, index) {
+                                      return MessageCard(
+                                        message: displayList[index],
+                                        onReply: (msg) => setState(() => _replyMessage = msg),
+                                      );
+                                    },
+                                  )
+                                : _buildSayHi();
+                          case ConnectionState.none:
+                            return const Center(child: Text('No connection'));
+                        }
                       },
                     ),
                   ),

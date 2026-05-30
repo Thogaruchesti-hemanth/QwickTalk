@@ -6,6 +6,7 @@ import 'package:chat_app/screens/archived_chats_screen.dart';
 import 'package:chat_app/screens/chat_screen.dart';
 import 'package:chat_app/screens/profile_screen.dart';
 import 'package:chat_app/widgets/chat_user_card.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -256,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           builder: (context, snapshot) {
             if (!snapshot.hasData) return const SizedBox();
             final fullList = snapshot.data?.docs
-                .map((e) => ChatUser.fromJson(e.data()))
+                .map((e) => ChatUser.fromJson(e.data() as Map<String, dynamic>))
                 .where((u) => u.isOnline)
                 .toList() ?? [];
 
@@ -438,7 +439,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           stream: APIs.getAllUsers(userIds),
           builder: (context, snapshot) {
             if (!snapshot.hasData) return _buildShimmerLoading();
-            _list = snapshot.data?.docs.map((e) => ChatUser.fromJson(e.data())).toList() ?? [];
+            _list = snapshot.data?.docs.map((e) => ChatUser.fromJson(e.data() as Map<String, dynamic>)).toList() ?? [];
             
             List<ChatUser> displayList = _isSearching ? _searchList : _list;
             

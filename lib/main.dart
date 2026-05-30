@@ -1,5 +1,6 @@
 import 'package:chat_app/screens/splash_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 // Global notification objects
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+final GlobalKey<ScaffoldMessengerState> messengerKey = GlobalKey<ScaffoldMessengerState>();
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'chats',
@@ -58,35 +60,48 @@ Future<void> _initializeNotifications() async {
   try {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+    if (!kIsWeb) {
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
 
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-    
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+      const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+      
+      await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    }
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       RemoteNotification? notification = message.notification;
-      AndroidNotification? android = message.notification?.android;
-
-      if (notification != null && android != null) {
-        flutterLocalNotificationsPlugin.show(
-          notification.hashCode,
-          notification.title,
-          notification.body,
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              channel.id,
-              channel.name,
-              channelDescription: channel.description,
-              icon: android.smallIcon,
-              importance: Importance.high,
-              priority: Priority.high,
+      
+      if (notification != null) {
+        if (kIsWeb) {
+          // Show a SnackBar on Web since system notifications don't show in foreground
+          messengerKey.currentState?.showSnackBar(
+            SnackBar(
+              content: Text('${notification.title}: ${notification.body}'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF7C3AED),
             ),
-          ),
-        );
+          );
+        } else {
+          // On Mobile
+          flutterLocalNotificationsPlugin.show(
+            notification.hashCode,
+            notification.title,
+            notification.body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                channel.id,
+                channel.name,
+                channelDescription: channel.description,
+                importance: Importance.high,
+                priority: Priority.high,
+                icon: '@mipmap/ic_launcher',
+              ),
+            ),
+          );
+        }
       }
     });
   } catch (e) {
@@ -102,6 +117,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Qwick Talk',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: messengerKey,
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(

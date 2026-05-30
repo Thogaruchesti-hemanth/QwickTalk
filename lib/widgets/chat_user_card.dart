@@ -3,6 +3,7 @@ import 'package:chat_app/api/apis.dart';
 import 'package:chat_app/models/message.dart';
 import 'package:chat_app/utils/common_utils.dart';
 import 'package:chat_app/widgets/profile_dialog.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_feather_icons/flutter_feather_icons.dart';
 
